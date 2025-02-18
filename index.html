@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Pin Saver</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBiTQeW61xgRinRb3IZ1O24IV6XsrHCi4c&libraries=places"></script>
+    <style>
+        #map { height: 80vh; width: 100%; }
+        #controls { padding: 10px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input id="searchBox" type="text" placeholder="Search location...">
+        <input type="number" id="radius" placeholder="Radius (meters)">
+        <input type="date" id="startDate">
+        <input type="date" id="endDate">
+        <button onclick="savePin()">Save Pin</button>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        let map;
+        let markers = [];
+        let searchBox;
+        let selectedLocation = null;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 37.7749, lng: -122.4194 },
+                zoom: 10,
+            });
+
+            searchBox = new google.maps.places.SearchBox(document.getElementById("searchBox"));
+            map.controls[google.maps.ControlPosition.TOP_LEFT].push(document.getElementById("searchBox"));
+
+            searchBox.addListener("places_changed", () => {
+                let places = searchBox.getPlaces();
+                if (places.length === 0) return;
+                
+                let place = places[0];
+                selectedLocation = {
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng()
+                };
+
+                clearMarkers();
+                let marker = new google.maps.Marker({
+                    position: selectedLocation,
+                    map: map
+                });
+                markers.push(marker);
+
+                map.setCenter(selectedLocation);
+                map.setZoom(14);
+            });
+
+            loadPins();
+        }
+
+        async function savePin() {
+            if (!selectedLocation) {
+                alert("Please search and select a location first!");
+                return;
+            }
+
+            let radius = parseInt(document.getElementById("radius").value);
+            let startDate = document.getElementById("startDate").value;
+            let endDate = document.getElementById("endDate").value;
+
+            let pinData = {
+                lat: selectedLocation.lat,
+                lng: selectedLocation.lng,
+                radius,
+                startDate,
+                endDate
+            };
+
+            let response = await fetch("https://map-pins-backend.onrender.com/pins", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(pinData)
+            });
+
+            let result = await response.json();
+            alert(result.message);
+            loadPins(); // Reload stored pins
+        }
+
+        async function loadPins() {
+            let response = await fetch("https://map-pins-backend.onrender.com/pins");
+            let pins = await response.json();
+            
+            clearMarkers();
+            
+            pins.forEach(pin => {
+                let marker = new google.maps.Marker({
+                    position: { lat: pin.lat, lng: pin.lng },
+                    map: map
+                });
+                markers.push(marker);
+
+                new google.maps.Circle({
+                    center: { lat: pin.lat, lng: pin.lng },
+                    radius: pin.radius,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.35,
+                    strokeWeight: 0,
+                    map: map
+                });
+            });
+        }
+
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
