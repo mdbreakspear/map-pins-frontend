@@ -17,6 +17,7 @@
         <input type="number" id="radius" placeholder="Radius (meters)">
         <input type="date" id="startDate">
         <input type="date" id="endDate">
+        <input type="text" id="pinText" placeholder="Enter pin description...">
         <button onclick="savePin()">Save Pin</button>
     </div>
     <div id="map"></div>
@@ -26,17 +27,15 @@
         let markers = [];
         let searchBox;
         let selectedLocation = null;
-
+        
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 37.7749, lng: -122.4194 }, 
                 zoom: 10,
             });
 
-            // Fix search function by initializing Places API properly
             let input = document.getElementById("searchBox");
             searchBox = new google.maps.places.SearchBox(input);
-
             map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
 
             searchBox.addListener("places_changed", () => {
@@ -98,13 +97,15 @@
             let radius = parseInt(document.getElementById("radius").value);
             let startDate = document.getElementById("startDate").value;
             let endDate = document.getElementById("endDate").value;
+            let pinText = document.getElementById("pinText").value;
 
             let pinData = {
                 lat: selectedLocation.lat,
                 lng: selectedLocation.lng,
                 radius,
                 startDate,
-                endDate
+                endDate,
+                text: pinText
             };
 
             let response = await fetch("https://map-pins-backend.onrender.com/pins", {
@@ -121,9 +122,8 @@
         async function loadPins() {
             let response = await fetch("https://map-pins-backend.onrender.com/pins");
             let pins = await response.json();
-            
             clearMarkers();
-            
+
             pins.forEach(pin => {
                 let marker = new google.maps.Marker({
                     position: { lat: pin.lat, lng: pin.lng },
@@ -131,7 +131,7 @@
                 });
                 markers.push(marker);
 
-                new google.maps.Circle({
+                let circle = new google.maps.Circle({
                     center: { lat: pin.lat, lng: pin.lng },
                     radius: pin.radius,
                     fillColor: "#FF0000",
@@ -139,7 +139,24 @@
                     strokeWeight: 0,
                     map: map
                 });
+
+                let infoWindow = new google.maps.InfoWindow({
+                    content: `<p>${pin.text}</p><button onclick="deletePin('${pin._id}')">Delete</button>`
+                });
+
+                marker.addListener("click", () => {
+                    infoWindow.open(map, marker);
+                });
             });
+        }
+
+        async function deletePin(pinId) {
+            let response = await fetch(`https://map-pins-backend.onrender.com/pins/${pinId}`, {
+                method: "DELETE"
+            });
+            let result = await response.json();
+            alert(result.message);
+            loadPins();
         }
 
         function clearMarkers() {
