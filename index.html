@@ -13,6 +13,7 @@
 <body>
     <div id="controls">
         <input id="searchBox" type="text" placeholder="Search location...">
+        <button onclick="getCurrentLocation()">Detect My Location</button>
         <input type="number" id="radius" placeholder="Radius (meters)">
         <input type="date" id="startDate">
         <input type="date" id="endDate">
@@ -28,17 +29,20 @@
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 37.7749, lng: -122.4194 },
+                center: { lat: 37.7749, lng: -122.4194 }, 
                 zoom: 10,
             });
 
-            searchBox = new google.maps.places.SearchBox(document.getElementById("searchBox"));
-            map.controls[google.maps.ControlPosition.TOP_LEFT].push(document.getElementById("searchBox"));
+            // Fix search function by initializing Places API properly
+            let input = document.getElementById("searchBox");
+            searchBox = new google.maps.places.SearchBox(input);
+
+            map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
 
             searchBox.addListener("places_changed", () => {
                 let places = searchBox.getPlaces();
                 if (places.length === 0) return;
-                
+
                 let place = places[0];
                 selectedLocation = {
                     lat: place.geometry.location.lat(),
@@ -59,9 +63,35 @@
             loadPins();
         }
 
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    let userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    clearMarkers();
+                    let marker = new google.maps.Marker({
+                        position: userLocation,
+                        map: map
+                    });
+                    markers.push(marker);
+
+                    map.setCenter(userLocation);
+                    map.setZoom(14);
+                    selectedLocation = userLocation;
+                }, () => {
+                    alert("Geolocation permission denied. Please allow location access.");
+                });
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        }
+
         async function savePin() {
             if (!selectedLocation) {
-                alert("Please search and select a location first!");
+                alert("Please search for a location or use 'Detect My Location' first!");
                 return;
             }
 
@@ -85,7 +115,7 @@
 
             let result = await response.json();
             alert(result.message);
-            loadPins(); // Reload stored pins
+            loadPins();
         }
 
         async function loadPins() {
