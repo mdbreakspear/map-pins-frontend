@@ -120,44 +120,56 @@
         }
 
         async function loadPins() {
-            let response = await fetch("https://map-pins-backend.onrender.com/pins");
-            let pins = await response.json();
-            clearMarkers();
+    let response = await fetch("https://map-pins-backend.onrender.com/pins");
+    let pins = await response.json();
+    clearMarkers();
 
-            pins.forEach(pin => {
-                let marker = new google.maps.Marker({
-                    position: { lat: pin.lat, lng: pin.lng },
-                    map: map
-                });
-                markers.push(marker);
+    pins.forEach(pin => {
+        let marker = new google.maps.Marker({
+            position: { lat: pin.lat, lng: pin.lng },
+            map: map
+        });
+        markers.push(marker);
 
-                let circle = new google.maps.Circle({
-                    center: { lat: pin.lat, lng: pin.lng },
-                    radius: pin.radius,
-                    fillColor: "#FF0000",
-                    fillOpacity: 0.35,
-                    strokeWeight: 0,
-                    map: map
-                });
+        let circle = new google.maps.Circle({
+            center: { lat: pin.lat, lng: pin.lng },
+            radius: pin.radius,
+            fillColor: "#FF0000",
+            fillOpacity: 0.35,
+            strokeWeight: 0,
+            map: map
+        });
 
-                let infoWindow = new google.maps.InfoWindow({
-                    content: `<p>${pin.text}</p><button onclick="deletePin('${pin._id}')">Delete</button>`
-                });
+        // Ensure pin.text is correctly assigned
+        let description = pin.text ? pin.text : "No description";
 
-                marker.addListener("click", () => {
-                    infoWindow.open(map, marker);
-                });
-            });
-        }
+        // Ensure pin._id is correctly passed for deletion
+        let infoWindow = new google.maps.InfoWindow({
+            content: `<p>${description}</p><button onclick="deletePin('${pin._id}')">Delete</button>`
+        });
 
-        async function deletePin(pinId) {
-            let response = await fetch(`https://map-pins-backend.onrender.com/pins/${pinId}`, {
-                method: "DELETE"
-            });
-            let result = await response.json();
-            alert(result.message);
-            loadPins();
-        }
+        marker.addListener("click", () => {
+            infoWindow.open(map, marker);
+        });
+    });
+}
+
+
+async function deletePin(pinId) {
+    if (!pinId) {
+        alert("Error: Pin ID is missing.");
+        return;
+    }
+
+    let response = await fetch(`https://map-pins-backend.onrender.com/pins/${pinId}`, {
+        method: "DELETE"
+    });
+
+    let result = await response.json();
+    alert(result.message);
+    loadPins();
+}
+
 
         function clearMarkers() {
             markers.forEach(marker => marker.setMap(null));
