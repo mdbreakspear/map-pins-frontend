@@ -25,9 +25,10 @@
     <script>
         let map;
         let markers = [];
+        let circles = [];
         let searchBox;
         let selectedLocation = null;
-        
+
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 37.7749, lng: -122.4194 }, 
@@ -48,18 +49,29 @@
                     lng: place.geometry.location.lng()
                 };
 
-                clearMarkers();
-                let marker = new google.maps.Marker({
-                    position: selectedLocation,
-                    map: map
-                });
-                markers.push(marker);
+                placeMarker(selectedLocation);
+            });
 
-                map.setCenter(selectedLocation);
-                map.setZoom(14);
+            map.addListener("click", (event) => {
+                selectedLocation = {
+                    lat: event.latLng.lat(),
+                    lng: event.latLng.lng()
+                };
+                placeMarker(selectedLocation);
             });
 
             loadPins();
+        }
+
+        function placeMarker(location) {
+            clearMarkers();
+            let marker = new google.maps.Marker({
+                position: location,
+                map: map
+            });
+            markers.push(marker);
+            map.setCenter(location);
+            map.setZoom(14);
         }
 
         function getCurrentLocation() {
@@ -69,16 +81,7 @@
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
-
-                    clearMarkers();
-                    let marker = new google.maps.Marker({
-                        position: userLocation,
-                        map: map
-                    });
-                    markers.push(marker);
-
-                    map.setCenter(userLocation);
-                    map.setZoom(14);
+                    placeMarker(userLocation);
                     selectedLocation = userLocation;
                 }, () => {
                     alert("Geolocation permission denied. Please allow location access.");
@@ -90,7 +93,7 @@
 
         async function savePin() {
             if (!selectedLocation) {
-                alert("Please search for a location or use 'Detect My Location' first!");
+                alert("Please select a location first!");
                 return;
             }
 
@@ -120,60 +123,57 @@
         }
 
         async function loadPins() {
-    let response = await fetch("https://map-pins-backend.onrender.com/pins");
-    let pins = await response.json();
-    clearMarkers();
+            let response = await fetch("https://map-pins-backend.onrender.com/pins");
+            let pins = await response.json();
+            clearMarkers();
 
-    pins.forEach(pin => {
-        let marker = new google.maps.Marker({
-            position: { lat: pin.lat, lng: pin.lng },
-            map: map
-        });
-        markers.push(marker);
+            pins.forEach(pin => {
+                let marker = new google.maps.Marker({
+                    position: { lat: pin.lat, lng: pin.lng },
+                    map: map
+                });
+                markers.push(marker);
 
-        let circle = new google.maps.Circle({
-            center: { lat: pin.lat, lng: pin.lng },
-            radius: pin.radius,
-            fillColor: "#FF0000",
-            fillOpacity: 0.35,
-            strokeWeight: 0,
-            map: map
-        });
+                let circle = new google.maps.Circle({
+                    center: { lat: pin.lat, lng: pin.lng },
+                    radius: pin.radius,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.35,
+                    strokeWeight: 0,
+                    map: map
+                });
+                circles.push(circle);
 
-        // Ensure pin.text is correctly assigned
-        let description = pin.text ? pin.text : "No description";
+                let description = pin.text ? pin.text : "No description";
+                let infoWindow = new google.maps.InfoWindow({
+                    content: `<p>${description}</p><button onclick="deletePin('${pin._id}')">Delete</button>`
+                });
 
-        // Ensure pin._id is correctly passed for deletion
-        let infoWindow = new google.maps.InfoWindow({
-            content: `<p>${description}</p><button onclick="deletePin('${pin._id}')">Delete</button>`
-        });
+                marker.addListener("click", () => {
+                    infoWindow.open(map, marker);
+                });
+            });
+        }
 
-        marker.addListener("click", () => {
-            infoWindow.open(map, marker);
-        });
-    });
-}
+        async function deletePin(pinId) {
+            if (!pinId) {
+                alert("Error: Pin ID is missing.");
+                return;
+            }
 
-
-async function deletePin(pinId) {
-    if (!pinId) {
-        alert("Error: Pin ID is missing.");
-        return;
-    }
-
-    let response = await fetch(`https://map-pins-backend.onrender.com/pins/${pinId}`, {
-        method: "DELETE"
-    });
-
-    let result = await response.json();
-    alert(result.message);
-    loadPins();
-}
-
+            let response = await fetch(`https://map-pins-backend.onrender.com/pins/${pinId}`, {
+                method: "DELETE"
+            });
+            let result = await response.json();
+            alert(result.message);
+            loadPins();
+        }
 
         function clearMarkers() {
             markers.forEach(marker => marker.setMap(null));
             markers = [];
+            circles.forEach(circle => circle.setMap(null));
+            circles = [];
         }
 
         window.onload = initMap;
